@@ -4,20 +4,10 @@ import { apiRequest } from "@/lib/client-api/base";
 import { Platform, PodcastInputType } from "@/lib/podcast/types";
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
-import { OptionItem, TcSelector } from "./TcSelector";
-import { languages as minimaxLng } from "@/lib/podcast/languages/minimax";
-import { languages as geminiLng } from "@/lib/podcast/languages/gemini";
-import { languages as fishAudioLng } from "@/lib/podcast/languages/fish_audio";
 import { CustomTextarea } from "./CustomTextarea";
 import { useTranslation } from "react-i18next";
-import { VoicePlayerButton } from "./VoicePlayerButton";
-import { FaCoins } from "react-icons/fa";
-import { getPlatformDefaultVoices } from "@/lib/podcast/client_utils";
-
-enum SelectType {
-  Select = 'select',
-  Input = 'input',
-}
+import { languages as minimaxLng } from "@/lib/podcast/languages/minimax";
+import { OptionItem, TcSelector } from '@/components/podcast/TcSelector';
 
 interface UserInputProps {
   onSubmitSuccess?: () => void;
@@ -30,35 +20,10 @@ export function UserInput({ onSubmitSuccess }: UserInputProps) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [readyToSubmit, setReadyToSubmit] = useState(false);
-  const [platform, setPlatform] = useState(Platform.FishAudio.toString());
-  const [voiceId_1, setVoiceId_1] = useState('');
-  const [voiceId_2, setVoiceId_2] = useState('');
-  const [outputLanguage, setOutputLanguage] = useState('auto');
-  const [voices, setVoices] = useState({});
-  const [voiceOptions, setVoiceOptions] = useState([]);
-  const [selectType, setSelectType] = useState(SelectType.Select);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
-  const audioRefs = useRef<{ [key: string]: HTMLAudioElement | null }>({});
+  const [outputLanguage, setOutputLanguage] = useState('auto');
+  const [platform, setPlatform] = useState(Platform.Minimax.toString());
 
-  // 监听 playingVoiceId 状态变化
-  useEffect(() => {
-    console.log('Main component - playingVoiceId changed to:', playingVoiceId);
-  }, [playingVoiceId]);
-
-  const tabs = [
-    { id: PodcastInputType.Topic, label: t('tabs.topic'), icon: "🧠" },
-    { id: PodcastInputType.Link, label: t('tabs.link'), icon: "🔗" },
-    { id: PodcastInputType.File, label: t('tabs.upload_file'), icon: "📁" },
-    { id: PodcastInputType.LongText, label: t('tabs.long_text'), icon: "📄" },
-    { id: PodcastInputType.FrontPage, label: t('tabs.front_page'), icon: "🌐" },
-  ];
-
-  const platforms: OptionItem[] = [
-    { id: Platform.Minimax, label: 'Minimax', icon: '🤖' },
-    { id: Platform.Gemini, label: 'Gemini', icon: '🤖' },
-    { id: Platform.FishAudio, label: 'Fish Audio', icon: '🐟' },
-    { id: Platform.FishAudio + '_custom', label: 'Fish Audio (Custom)', icon: '🐟' },
-  ]
   const lngOpt2OptionItem = (lngs: any[]) => {
     const audoOpt = [{
       id: 'auto',
@@ -72,79 +37,25 @@ export function UserInput({ onSubmitSuccess }: UserInputProps) {
       icon: ''
     }))]
   }
+
   const languages = {
     [Platform.Minimax]: lngOpt2OptionItem(minimaxLng),
-    [Platform.Gemini]: lngOpt2OptionItem(geminiLng),
-    [Platform.FishAudio]: lngOpt2OptionItem(fishAudioLng),
-    [Platform.FishAudio + '_custom']: lngOpt2OptionItem(fishAudioLng),
   }
-  const platformDefaultVoices = getPlatformDefaultVoices(i18n.language)
-
-  const platformTips = {
-    [Platform.Minimax]: 'https://platform.minimaxi.com/examination-center/voice-experience-center/t2a_v2',
-    // [Platform.Gemini]: 'Gemini',
-    [Platform.FishAudio]: 'http://bit.ly/4k7AXHt',
-    [Platform.FishAudio + '_custom']: 'http://bit.ly/4k7AXHt',
-  }
-
+  // 监听 playingVoiceId 状态变化
   useEffect(() => {
-    const fetchVoices = async () => {
-      const resp = await apiRequest({
-        url: '/api/voices',
-        method: 'GET',
-      })
-      setVoices(resp.data.data)
-    }
-    fetchVoices()
-  }, []);
+    console.log('Main component - playingVoiceId changed to:', playingVoiceId);
+  }, [playingVoiceId]);
 
-  useEffect(() => {
-    if (platform) {
-      console.log('platform', platform)
-      // setVoiceId_1('');
-      // setVoiceId_2('');
-      if (platform.includes('custom')) {
-        setSelectType(SelectType.Input);
-      } else {
-        setSelectType(SelectType.Select);
-        if (voices[platform]) {
-          setVoiceOptions(voices[platform].map(v => {
-            return {
-              id: v.id,
-              label: v.name,
-              icon: v.icon,
-              render: (option: OptionItem) => {
-                return (
-                  <VoicePlayerButton
-                    key={v.id}
-                    id={v.id}
-                    sample={v.sample}
-                    label={option.label}
-                    playingVoiceId={playingVoiceId}
-                    setPlayingVoiceId={setPlayingVoiceId}
-                    audioRefs={audioRefs}
-                  />
-                );
-              }
-            }
-          }))
-        } else {
-          setVoiceOptions([])
-        }
-      }
-      // set voice id
-      if (platformDefaultVoices[platform as Platform]) {
-        setVoiceId_1(platformDefaultVoices[platform as Platform].voiceId_1)
-        setVoiceId_2(platformDefaultVoices[platform as Platform].voiceId_2)
-      }
-    }
-  }, [platform, voices, playingVoiceId])
+  const tabs = [
+    { id: PodcastInputType.Topic, label: t('tabs.topic'), icon: "🧠" },
+    { id: PodcastInputType.Link, label: t('tabs.link'), icon: "🔗" },
+    { id: PodcastInputType.File, label: t('tabs.upload_file'), icon: "📁" },
+    { id: PodcastInputType.LongText, label: t('tabs.long_text'), icon: "📄" },
+    { id: PodcastInputType.FrontPage, label: t('tabs.front_page'), icon: "🌐" },
+  ];
 
   useEffect(() => {
     const isReadyToSubmit = () => {
-      if (!platform || !voiceId_1 || !voiceId_2) {
-        return false;
-      }
       if (activeTab == PodcastInputType.File) {
         return !!file;
       } else {
@@ -152,21 +63,8 @@ export function UserInput({ onSubmitSuccess }: UserInputProps) {
       }
     }
     setReadyToSubmit(isReadyToSubmit());
-    // console.log('file', file, 'topic', topic, 'readyToSubmit', readyToSubmit);
-  }, [file, topic, activeTab, platform, voiceId_1, voiceId_2]);
-
-  useEffect(() => {
-    // 当 platform 或 voices 变化时，重置播放状态
-    console.log('Platform/voices changed, resetting playingVoiceId. Platform:', platform, 'Voices keys:', Object.keys(voices));
-    setPlayingVoiceId(null);
-    // 暂停所有 audio
-    Object.values(audioRefs.current).forEach(audio => {
-      if (audio) {
-        audio.pause();
-        audio.currentTime = 0;
-      }
-    });
-  }, [platform, voices]);
+    console.log('file', file, 'topic', topic, 'readyToSubmit', readyToSubmit);
+  }, [file, topic, activeTab]);
 
   const resetFile = () => {
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
@@ -182,9 +80,6 @@ export function UserInput({ onSubmitSuccess }: UserInputProps) {
     try {
       const formData = new FormData();
       formData.append("type", activeTab);
-      formData.append("platform", platform);
-      formData.append("voice_id_1", voiceId_1);
-      formData.append("voice_id_2", voiceId_2);
       formData.append("language", outputLanguage);
       if (activeTab == PodcastInputType.File) {
         formData.append("file", file as File);
@@ -192,7 +87,7 @@ export function UserInput({ onSubmitSuccess }: UserInputProps) {
         formData.append("text", topic);
       }
       await apiRequest({
-        url: "/api/protected/gen-podcast",
+        url: "/api/protected/gen-scripts",
         method: "POST",
         data: formData,
       });
@@ -378,74 +273,33 @@ export function UserInput({ onSubmitSuccess }: UserInputProps) {
             </button>
           ))}
         </div>
-
         {/* Input Section */}
         <div className="mb-5 sm:mb-6">
           {renderInputSection()}
         </div>
-
-        {/* Bottom Section with Speed Selector and Create Button */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
-          <TcSelector value={platform} onChange={(v) => {
-            setPlatform(v);
-            if (v.includes('custom')) {
-              setVoiceId_1('');
-              setVoiceId_2('');
-            }
-          }} options={platforms} title={t('platform')} />
-          {selectType == SelectType.Select && <TcSelector value={voiceId_1} onChange={setVoiceId_1} options={voiceOptions} title={t('voice_1')} />}
-          {selectType == SelectType.Select && <TcSelector value={voiceId_2} onChange={setVoiceId_2} options={voiceOptions} title={t('voice_2')} />}
-          {selectType == SelectType.Input && <input type="text" value={voiceId_1} onChange={(e) => setVoiceId_1(e.target.value)} placeholder="Voice id" className="w-full sm:w-32 px-3 sm:px-4 py-2 sm:py-3 text-sm bg-gradient-to-br from-white/90 to-white/60 dark:from-gray-800/90 dark:to-gray-900/60 backdrop-blur-sm border-0 rounded-lg sm:rounded-xl focus:outline-none focus:ring-0 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-none" style={{ boxShadow: 'inset 0 4px 20px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4)' }} />}
-          {selectType == SelectType.Input && <input type="text" value={voiceId_2} onChange={(e) => setVoiceId_2(e.target.value)} placeholder="Voice id" className="w-full sm:w-32 px-3 sm:px-4 py-2 sm:py-3 text-sm bg-gradient-to-br from-white/90 to-white/60 dark:from-gray-800/90 dark:to-gray-900/60 backdrop-blur-sm border-0 rounded-lg sm:rounded-xl focus:outline-none focus:ring-0 text-gray-800 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 resize-none" style={{ boxShadow: 'inset 0 4px 20px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4)' }} />}
-          <TcSelector value={outputLanguage} onChange={setOutputLanguage} options={languages[platform as Platform]} title={t('output_language')} />
-
-          {/* Create Button */}
-          <button
-            onClick={handleSubmit}
-            disabled={!readyToSubmit || loading}
-            className="flex items-center justify-center gap-2 px-6 sm:px-8 py-2 sm:py-3 bg-gradient-to-r from-gray-900 via-pink-900 to-indigo-900 dark:from-white dark:via-pink-100 dark:to-indigo-100 text-white dark:text-gray-900 rounded-lg sm:rounded-xl hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 font-semibold shadow-lg relative overflow-hidden flex-1 sm:flex-initial"
-            style={{
-              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.12)'
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none rounded-lg sm:rounded-xl"></div>
-            {loading ? (
-              <>
-                <svg className="animate-spin h-4 w-4 text-white dark:text-gray-900 relative z-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                </svg>
-                <span className="text-xs sm:text-sm font-bold relative z-10 ml-2">{t('create_button_loading')}</span>
-              </>
-            ) : (
-              <>
-                <span className="text-xs sm:text-sm font-bold relative z-10 flex items-center gap-1">
-                  {t('create_button')}
-                </span>
-              </>
-            )}
-          </button>
+        {/* Choose Scripts Language andCreate Button */}
+        <div className="mb-5 sm:mb-6">
+          <TcSelector value={outputLanguage} onChange={setOutputLanguage} options={languages[platform as Platform]} title={t('scripts_language')} />
         </div>
-        {/* platform tips */}
-        {platformTips[platform as Platform] && (
-          <div className="mt-4 sm:mt-5">
-            <a
-              href={platformTips[platform as Platform]}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-indigo-50/80 to-purple-50/60 dark:from-indigo-900/40 dark:to-purple-900/30 rounded-lg sm:rounded-xl hover:scale-[1.02] transition-all duration-300 text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 relative overflow-hidden"
-              style={{
-                boxShadow: 'inset 0 2px 10px rgba(99, 102, 241, 0.1), 0 4px 20px rgba(99, 102, 241, 0.05)'
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent pointer-events-none rounded-lg sm:rounded-xl"></div>
-              <span className="relative z-10">🔗</span>
-              <span className="relative z-10 font-medium">
-                {t('more_voices_about', { platform: platforms.find(p => p.id == platform)?.label })}
-              </span>
-            </a>
-          </div>
-        )}
+        <button
+          onClick={handleSubmit}
+          disabled={!readyToSubmit}
+          className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 font-semibold shadow-lg relative overflow-hidden"
+        >
+          {loading ? (
+            <>
+              <svg className="animate-spin h-5 w-5 text-white relative z-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+              </svg>
+              <span className="text-sm font-bold relative z-10">creating...</span>
+            </>
+          ) : (
+            <>
+              <span className="text-sm font-bold relative z-10">✏️ Create Scripts</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
   );

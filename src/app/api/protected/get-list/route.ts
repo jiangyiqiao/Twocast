@@ -5,7 +5,7 @@ import { NextRequest } from "next/server";
 import { TaskVO } from "@/lib/client-api/types/TaskVO";
 import { getCurrentUser } from "@/utils/user";
 import { taskGetStepItem } from "@/lib/podcast/task";
-import { PodcastStep } from "@/lib/podcast/types";
+import { LongTextOutput, PodcastStep } from "@/lib/podcast/types";
 import { LongTextResult } from "@/queue/types";
 import { getTaskStatusHuman } from "@/utils/task";
 
@@ -36,10 +36,17 @@ export async function GET(req: NextRequest) {
         }
         let result: any = {}
         const audioItem = taskGetStepItem(task, PodcastStep.Audio)
+        const longtextIem = taskGetStepItem(task, PodcastStep.LongText)
         if (audioItem) {
             result = audioItem.input as LongTextResult || {}
             result.audio_url = audioItem.output?.location as string
             result.duration = audioItem.output?.duration
+        }
+        if (longtextIem) {
+            result.title = longtextIem.output?.title || ''
+            result.outline = longtextIem.output?.outline || ''
+            result.key_points = longtextIem.output?.key_points || []
+            result.script = longtextIem.output?.script || []
         }
         return {
             uuid: task.uuid,

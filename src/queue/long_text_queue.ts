@@ -4,17 +4,15 @@ import { BaseJobData, LongTextResult } from "./types";
 import { getDb } from "@/db/db";
 import { tasksTable } from "@/db/schema";
 import { Task } from "@/db/types";
+import { TaskStatus } from "@/types/task";
 import { taskGetStepItem, taskUpdateStepItem } from "@/lib/podcast/task";
 import { queryWrap } from "@/utils/db-util";
 import { queryChat } from "@/utils/xai";
-// import Queue, { Job } from "bee-queue";
-import { getTaskLogKey } from "@/utils/task";
 import { Queue } from 'bullmq';
 import { eq } from "drizzle-orm";
 import fs from "fs";
 import { ChatCompletion } from "openai/resources/index";
 import path from "path";
-import { getAudioQueue } from "./audio_queue";
 import { initQueue } from "./queue_base";
 import { getScriptLength } from "@/lib/podcast/client_utils";
 import { retry } from "@/lib/podcast/utils";
@@ -47,9 +45,16 @@ export function setupLongTextQueue() {
 export async function processLongTextTask(task: Task) {
   const stepItem = taskGetStepItem(task, PodcastStep.LongText)
   const userInputs = task.userInputs as TaskUserInput
-  const input = stepItem.input!.slice(0, 100_000)
+  
+  // 检查input是否存在
+  if (!stepItem.input) {
+    console.error(`[${currentStep}:processTask] stepItem.input is null or undefined, task_id=${task.id}`)
+    throw new Error('LongText step input is missing')
+  }
+  
+  const input = stepItem.input.slice(0, 100_000)
 
-  // console.log(`[${currentStep}:processTask] generate script, key=${getTaskLogKey(task)}`)
+  console.log(`[${currentStep}:processTask] generate script, key=${task.uuid}`)
   // 生成脚本
   let text = ''
   let result: LongTextResult
@@ -123,8 +128,6 @@ export async function processLongTextTask(task: Task) {
         return result
       })
     ])
-    // console.log(`[${currentStep}:processTask] genOutlineResult=${JSON.stringify(outlineResult)}, genScriptResult=${JSON.stringify(scriptResult)}`)
-    // return
     result = {
       title: outlineResult.title,
       outline: outlineResult.outline,
@@ -134,21 +137,38 @@ export async function processLongTextTask(task: Task) {
     }
   }
 
-
-  // 下一步的参数
-  taskUpdateStepItem(task, PodcastStep.Audio, {
-    input: result,
+  console.log(`[${currentStep}:processTask] generated result:`, {
+    title: result.title,
+    outline: result.outline?.substring(0, 100) + '...',
+    scriptLength: result.script?.length || 0
   })
-  if (process.env.NEXT_PUBLIC_CLERK_ENABLED) {
+
+  // 更新LongText步骤的输出
+  taskUpdateStepItem(task, PodcastStep.LongText, {
+    output: {
+      title: result.title,
+      outline: result.outline,
+      key_points: result.key_points,
+      script: result.script,
+      script_length: result.script_length
+    },
+    updated_at: new Date()
+  })
+
+  // 保存到数据库
+  try {
+    await queryWrap(getDb().update(tasksTable).set({
+      stepsDetail: task.stepsDetail,
+      status: TaskStatus.Success,
+      updatedAt: new Date()
+    }).where(eq(tasksTable.id, task.id)))
+    
+    console.log(`[${currentStep}:processTask] saved to database successfully, task_id=${task.id}`)
+    console.log(`[${currentStep}:processTask] script generation completed, task_id=${task.id}`)
+  } catch (error) {
+    console.error(`[${currentStep}:processTask] failed to save to database:`, error)
+    throw error
   }
-
-  // save to db
-  await queryWrap(getDb().update(tasksTable).set({
-    stepsDetail: task.stepsDetail
-  }).where(eq(tasksTable.id, task.id)))
-
-  // 传给下个队列
-  getAudioQueue().add('audio', { task: task })
 }
 
 export interface GenOutlineResult {

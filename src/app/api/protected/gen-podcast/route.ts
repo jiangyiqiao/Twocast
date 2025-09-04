@@ -1,20 +1,14 @@
-import { respData, respErr, respErrCode } from "@/utils/resp";
-
-import { getDb } from "@/db/db";
-import { tasksTable } from "@/db/schema";
-import { NewTask } from "@/db/types";
-import { taskSetStepItem } from "@/lib/podcast/task";
-import { PodcastInputType, PodcastStep } from "@/lib/podcast/types";
-import { genTaskId } from '@/models/task';
-import { getLinkQueue } from "@/queue/link_queue";
-import { getLongTextQueue } from "@/queue/long_text_queue";
-import { getTopicQueue } from "@/queue/topic_queue";
+import { respData, respErr } from "@/utils/resp";
+import { getCurrentUser } from "@/utils/user";
+import { getTaskByUuid } from "@/models/task";
+import { taskGetStepItem, taskUpdateStepItem } from "@/lib/podcast/task";
+import { PodcastStep } from "@/lib/podcast/types";
+import { getAudioQueue } from "@/queue/audio_queue";
 import { TaskStatus } from "@/types/task";
 import { queryWrap } from "@/utils/db-util";
-import { getCurrentUser } from "@/utils/user";
-import axios from "axios";
-import { Buffer } from "buffer";
-import { getFrontPageQueue } from "@/queue/front_page_queue";
+import { getDb } from "@/db/db";
+import { tasksTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
   const { userId, userEmail } = await getCurrentUser()
@@ -23,131 +17,90 @@ export async function POST(req: Request) {
   }
 
   const formData = await req.formData()
-  const type = formData.get('type')
-  let text = formData.get('text')
-  const platform = formData.get('platform')
-  const voice_id_1 = formData.get('voice_id_1')
-  const voice_id_2 = formData.get('voice_id_2')
-  const file = formData.get('file')
-  const language = formData.get('language')
-  if (type === PodcastInputType.File && file) {
-    text = await extractTextFromTextract(file as unknown as File)
-    text = text.replace(/\n[\n]+/g, '\n').trim()
-  } else if (text && typeof text === 'string') {
-    text = text.trim()
-    if (text.length > 100_000) {
-      return respErr("invalid params: text is too long");
-    }
-  }
-  if (!text) {
-    return respErr("invalid params: text is empty");
+  const taskUuid = formData.get('task_uuid') as string
+  const platform = formData.get('platform') as string
+  const voiceId_1 = formData.get('voice_id_1') as string
+  const voiceId_2 = formData.get('voice_id_2') as string
+  const language = formData.get('language') as string
+
+  if (!taskUuid || !platform || !voiceId_1 || !voiceId_2) {
+    return respErr("missing required parameters");
   }
 
-  // check credits
-  if (process.env.NEXT_PUBLIC_CLERK_ENABLED) {
-  }
-
-  // check if there is a pending task
-  if (process.env.NEXT_PUBLIC_CLERK_ENABLED) {
-  }
-
-  const task: NewTask = {
-    userId: userId,
-    uuid: genTaskId(),
-    userEmail: userEmail,
-    userInputs: {
-      type: type as PodcastInputType,
-      text: text as string,
-      platform: platform,
-      voice_id_1: voice_id_1,
-      voice_id_2: voice_id_2,
-      language: language as string,
-      // file: resp?.Location || ""
-    },
-    status: TaskStatus.Pending,
-    consumedCredits: 0,
-    createdAt: new Date(),
-  }
-
-  // 设置队列参数
-  switch (type) {
-    case PodcastInputType.Topic:
-      taskSetStepItem(task, PodcastStep.Topic, {
-        input: text,
-      })
-      break
-    case PodcastInputType.Link:
-      taskSetStepItem(task, PodcastStep.Link, {
-        input: text,
-      })
-      break
-    case PodcastInputType.File:
-    case PodcastInputType.LongText:
-      taskSetStepItem(task, PodcastStep.LongText, {
-        input: text,
-      })
-      break
-    case PodcastInputType.FrontPage:
-      taskSetStepItem(task, PodcastStep.FrontPage, {
-        input: text,
-      })
-      break
-  }
-
-
-  // save to db
-  task.id = (await queryWrap(getDb().insert(tasksTable).values(task).returning({ id: tasksTable.id })))[0].id!
-
-  // 传给队列
-  switch (type) {
-    case PodcastInputType.Topic:
-      getTopicQueue().add('topic', { task: task })
-      break
-    case PodcastInputType.Link:
-      getLinkQueue().add('link', { task: task })
-      break
-    case PodcastInputType.File:
-    case PodcastInputType.LongText:
-      getLongTextQueue().add('long_text', { task: task })
-      break
-    case PodcastInputType.FrontPage:
-      getFrontPageQueue().add('front_page', { task: task })
-      break
-  }
-
-  return respData(task);
-}
-
-async function extractTextFromTextract(file: File): Promise<string> {
-  // 1. 获取文件名和类型
-  const name = file.name || '';
-  const ext = name.split('.').pop()?.toLowerCase();
-  // 2. 读取文件内容为 Buffer
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
-  // 3. 转为 base64
-  const base64String = buffer.toString('base64');
-
-  // 4. 构造请求体
-  const data = {
-    data: base64String,
-    file_type: ext,
-  };
-
-  // 5. 发送 POST 请求
   try {
-    const resp = await axios.post(process.env.SERVICE_TEXTRACT_API!, data, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      timeout: 60000, // 60s 超时
-    });
-    if (resp.data && typeof resp.data.text === 'string') {
-      return resp.data.text;
-    } else {
-      throw new Error('Textract API 响应无效');
+    // 获取任务
+    const task = await getTaskByUuid(taskUuid);
+    if (!task) {
+      return respErr("task not found");
     }
-  } catch (err: any) {
-    throw new Error('Textract API 调用失败: ' + (err?.message || err));
+
+    // 验证任务属于当前用户
+    if (task.userEmail !== userEmail) {
+      return respErr("unauthorized");
+    }
+
+    // 从数据库中获取最新的LongText步骤输出数据
+    const longTextItem = taskGetStepItem(task, PodcastStep.LongText);
+    if (!longTextItem.output) {
+      return respErr("LongText output not found");
+    }
+
+    const longTextOutput = longTextItem.output;
+    const scripts = longTextOutput.script || [];
+    const title = longTextOutput.title || '';
+    const outline = longTextOutput.outline || '';
+    const keyPoints = longTextOutput.key_points || '';
+
+    console.log(`[gen-podcast] using latest script data:`, {
+      taskUuid,
+      scriptCount: scripts.length,
+      title: title.substring(0, 50) + '...',
+      outline: outline.substring(0, 50) + '...'
+    });
+
+    // 更新用户输入
+    const userInputs = {
+      ...task.userInputs,
+      platform,
+      voice_id_1: voiceId_1,
+      voice_id_2: voiceId_2,
+      language
+    };
+
+    // 更新Audio步骤的输入，使用最新的数据库数据
+    taskUpdateStepItem(task, PodcastStep.Audio, {
+      input: {
+        title: title,
+        outline: outline,
+        key_points: keyPoints,
+        script: scripts,
+        script_length: scripts.length
+      },
+      updated_at: new Date()
+    });
+
+    // 更新任务状态和用户输入
+    await queryWrap(getDb().update(tasksTable).set({
+      userInputs,
+      stepsDetail: task.stepsDetail,
+      status: TaskStatus.Processing,
+      updatedAt: new Date()
+    }).where(eq(tasksTable.id, task.id)));
+
+    // 添加到音频生成队列
+    getAudioQueue().add('audio', { task: {
+      ...task,
+      userInputs
+    }});
+
+    return respData({ 
+      message: "Podcast generation started",
+      task_uuid: taskUuid,
+      script_count: scripts.length
+    });
+
+  } catch (error) {
+    console.error("Error in gen-podcast:", error);
+    return respErr("internal server error");
   }
 }

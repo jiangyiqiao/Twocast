@@ -69,21 +69,38 @@ GrowthXAI 融资1200万美元的Series A轮，并在一年内实现年收入700�
     text = data.choices[0].message.content!
   }
 
-  // set value
+  console.log(`[${currentStep}:processTask] generated text length: ${text.length}`)
+
+  // 更新Topic步骤
   taskUpdateStepItem(task, PodcastStep.Topic, {
     updated_at: new Date(),
   })
+  
+  // 设置LongText步骤的输入
   taskSetStepItem(task, PodcastStep.LongText, {
     input: text,
+    updated_at: new Date()
   })
-  if (process.env.NEXT_PUBLIC_CLERK_ENABLED) {
-  }
-
+  
+  console.log(`[${currentStep}:processTask] set LongText input, task.stepsDetail:`, {
+    hasLongText: !!task.stepsDetail?.long_text,
+    hasInput: !!task.stepsDetail?.long_text?.input,
+    inputLength: task.stepsDetail?.long_text?.input?.length || 0
+  })
+  
   // save to db
   await queryWrap(getDb().update(tasksTable).set({
     stepsDetail: task.stepsDetail
   }).where(eq(tasksTable.id, task.id)))
-
+  
+  console.log(`[${currentStep}:processTask] saved to database, task_id=${task.id}`)
+  
+  // 重新从数据库获取最新的任务数据，确保传递给下一个队列的是最新状态
+  const updatedTasks = await queryWrap(getDb().select().from(tasksTable).where(eq(tasksTable.id, task.id)))
+  const updatedTask = updatedTasks[0]
+  
+  console.log(`[${currentStep}:processTask] retrieved updated task, stepsDetail keys:`, Object.keys(updatedTask.stepsDetail || {}))
+  
   // 传给下个队列
-  getLongTextQueue().add('long_text', { task: task })
+  getLongTextQueue().add('long_text', { task: updatedTask })
 }

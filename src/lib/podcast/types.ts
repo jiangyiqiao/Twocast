@@ -3,10 +3,21 @@ export type AudioOutput = {
   duration: number;
 }
 
+export interface LongTextOutput {
+  title?: string;
+  key_points?: string[];
+  outline?: string;
+  script?: ScriptItem[];
+}
+
 export interface AudioResult {
-  audio: Buffer;
+  audio: Uint8Array;
   format: string;
   duration?: number;
+}
+
+export interface ScriptResult {
+  script: ScriptItem[]; 
 }
 
 export enum PodcastInputType {
@@ -47,8 +58,6 @@ export type StepsDetailItem = {
 
 export enum Platform {
   Minimax = 'minimaxi',
-  Gemini = 'gemini',
-  FishAudio = 'fish_audio',
 }
 
 export type VoiceOption = {
@@ -60,5 +69,5 @@ export type VoiceOption = {
 export type ScriptItem = {
   text: string
   role: string
-  audio_bytes?: Buffer
+  audio_bytes?: Uint8Array
 }
