@@ -4,6 +4,8 @@ import { OptionItem, TcSelector } from '@/components/podcast/TcSelector';
 import { Platform, ScriptItem } from '@/lib/podcast/types';
 import { useTranslation } from 'react-i18next';
 import { languages as minimaxLng } from '@/lib/podcast/languages/minimax';
+import { languages as geminiLng } from "@/lib/podcast/languages/gemini";
+import { languages as fishAudioLng } from "@/lib/podcast/languages/fish_audio";
 import { apiRequest } from '@/lib/client-api/base';
 import { toast } from 'sonner';
 import { VoicePlayerButton } from '@/components/podcast/VoicePlayerButton';
@@ -18,7 +20,7 @@ interface PodcastCreateProps {
 }
 export default function PodcastCreate({task}: PodcastCreateProps) {
   // 音频选择相关状态
-  const [platform, setPlatform] = useState(Platform.Minimax.toString());
+  const [platform, setPlatform] = useState(Platform.FishAudio.toString());
   const [voiceId_1, setVoiceId_1] = useState('');
   const [voiceId_2, setVoiceId_2] = useState('');
   const [outputLanguage, setOutputLanguage] = useState('auto');
@@ -30,8 +32,12 @@ export default function PodcastCreate({task}: PodcastCreateProps) {
   const {t, i18n} = useTranslation('podcast');
   const [readyToSubmit, setReadyToSubmit] = useState(false);
   const [loading, setLoading] = useState(false);
+
   const platforms: OptionItem[] = [
     { id: Platform.Minimax, label: 'Minimax', icon: '🤖' },
+    { id: Platform.Gemini, label: 'Gemini', icon: '🤖' },
+    { id: Platform.FishAudio, label: 'Fish Audio', icon: '🐟' },
+    { id: Platform.FishAudio + '_custom', label: 'Fish Audio (Custom)', icon: '🐟' },
   ]
   const lngOpt2OptionItem = (lngs: any[]) => {
     const audoOpt = [{
@@ -48,6 +54,9 @@ export default function PodcastCreate({task}: PodcastCreateProps) {
   }
   const languages = {
     [Platform.Minimax]: lngOpt2OptionItem(minimaxLng),
+    [Platform.Gemini]: lngOpt2OptionItem(geminiLng),
+    [Platform.FishAudio]: lngOpt2OptionItem(fishAudioLng),
+    [Platform.FishAudio + '_custom']: lngOpt2OptionItem(fishAudioLng),
   }
   const platformTips = {
     [Platform.Minimax]: 'https://platform.minimaxi.com/examination-center/voice-experience-center/t2a_v2',
@@ -204,6 +213,26 @@ export default function PodcastCreate({task}: PodcastCreateProps) {
             )}
           </button>
         </div>
+        {/* platform tips */}   
+        {platformTips[platform as Platform] && (
+          <div className="mt-4 sm:mt-5">
+            <a
+              href={platformTips[platform as Platform]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-indigo-50/80 to-purple-50/60 dark:from-indigo-900/40 dark:to-purple-900/30 rounded-lg sm:rounded-xl hover:scale-[1.02] transition-all duration-300 text-indigo-600 dark:text-indigo-300 hover:text-indigo-700 dark:hover:text-indigo-200 relative overflow-hidden"
+              style={{
+                boxShadow: 'inset 0 2px 10px rgba(99, 102, 241, 0.1), 0 4px 20px rgba(99, 102, 241, 0.05)'
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent pointer-events-none rounded-lg sm:rounded-xl"></div>
+              <span className="relative z-10">🔗</span>
+              <span className="relative z-10 font-medium">
+                {t('more_voices_about', { platform: platforms.find(p => p.id == platform)?.label })}
+              </span>
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

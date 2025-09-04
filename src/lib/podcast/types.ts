@@ -58,7 +58,10 @@ export type StepsDetailItem = {
 
 export enum Platform {
   Minimax = 'minimaxi',
+  Gemini = 'gemini',
+  FishAudio = 'fish_audio',
 }
+
 
 export type VoiceOption = {
   id: string
